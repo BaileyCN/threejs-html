@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>场景基本方法&属性</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+  <script src="../libs/dat/dat.gui.js"></script>
+</head>
+<body>
+
+<div id="webgl-output"></div>
+<div id="stats-wrap"></div>
+
+<script type="module">
+  import {
+    Scene,
+    PerspectiveCamera,
+    WebGLRenderer,
+    BoxGeometry,
+    MeshBasicMaterial,
+    Mesh,
+    AxesHelper,
+    PlaneGeometry,
+    MeshLambertMaterial,
+    AmbientLight,
+    SpotLight,
+    Vector2,
+    Fog,
+    FogExp2,
+    Color,
+    OrthographicCamera
+  } from '../libs/threejs/Three.js';
+
+  import { Stats } from '../libs/Stats/Stats.js';
+
+  let output = document.getElementById('webgl-output');
+  let scene = new Scene();
+
+  // 透视摄像机
+  // 该相机的特点是能将场景中的物体进行近大远小的渲染，效果更加真是，所以通常使用该相机。
+  // 第一个参数：表示这个摄像机中能够看到的哪部分场景，可以理解为我们能看到的视角
+  // 第二个参数：表示渲染的长宽比，变小后场景会显示压扁的效果
+  // 第三个参数：表示距离摄像机多近的位置开始渲染
+  // 第四个参数：表示摄像机从它所处位置能够看的多远，也就是场景渲染的最远位置
+
+  // let camera = new PerspectiveCamera(
+  //   75,
+  //   window.innerWidth / window.innerHeight,
+  //   0.1,
+  //   1000
+  // );
+  // camera.position.x = -30;
+  // camera.position.y = 45;
+  // camera.position.z = 35;
+  // camera.lookAt(scene.position);
+
+
+  // 正交投影摄像机
+  // 该相机不能能将场景中的物体渲染成近大远小的效果，场景的所有正方体大小均是一样的。
+  /**
+   * 第一个参数：左边界，可以理解为渲染部分的左边界，调整后可将场景向左压缩
+   * 第二个参数：右边界，可以理解为渲染部分的右边界，调整后可将场景向右压缩
+   * 第三个参数：上边界，可以理解为渲染部分的上边界，调整后可将场景向上压缩
+   * 第四个参数：下边界，可以理解为渲染部分的下边界，调整后可将场景向下压缩
+   * 第五个参数：近端距离，可以理解为摄像机所处位置从该点开始渲染
+   * 第六个参数：远端距离，可以理解为摄像机所处位置从该点停止渲染
+   *
+   */
+  let camera = new OrthographicCamera(
+    window.innerWidth / -16,
+    window.innerWidth / 16,
+    window.innerHeight / 16,
+    window.innerHeight / -16,
+    50,
+    80
+  );
+
+  camera.position.x = -30;
+  camera.position.y = 45;
+  camera.position.z = 35;
+  camera.lookAt(scene.position);
+
+  let axes = new AxesHelper(50);
+  axes.setColors(0xff0000, 0x00ff00, 0x0000ff);
+  scene.add(axes);
+
+  let geometry = new BoxGeometry(8, 8, 8);
+  let material = new MeshLambertMaterial({color: 0xff2299});
+  let cube = new Mesh(geometry, material);
+  cube.castShadow = true;
+  cube.position.x = 4;
+  cube.position.y = 10;
+  cube.position.z = 20;
+  // scene.add(cube);
+
+  // 地面
+  let planeGeometry = new PlaneGeometry(100, 100);
+  let planeMaterial = new MeshLambertMaterial({color: 0xcccccc});
+  let plane = new Mesh(planeGeometry, planeMaterial);
+  plane.rotation.x = -0.5 * Math.PI;
+  plane.position.set(15, 0, 0);
+  plane.receiveShadow = true;
+  scene.add(plane);
+
+  // 布满场景的小方块
+  for (let i = 0; i < planeGeometry.parameters.height / 5; i++) {
+    for (let j = 0; j < planeGeometry.parameters.width / 5; j++) {
+      let cubeGeometry = new BoxGeometry(4, 4, 4);
+      let cubeMaterial = new MeshLambertMaterial();
+      cubeMaterial.color = new Color(0, Math.random() * 0.25 + 0.5, 0)
+      let cubeItem = new Mesh(cubeGeometry, cubeMaterial);
+      cubeItem.castShadow = true;
+      cubeItem.position.x = -(planeGeometry.parameters.width / 2) + 15 + (i * 5);
+      cubeItem.position.y = 10;
+      cubeItem.position.z = -(planeGeometry.parameters.height / 2) + 5 + (j * 5);
+      scene.add(cubeItem);
+    }
+  }
+
+
+  let ambientLight = new AmbientLight(0xAAAAAA);
+  scene.add(ambientLight);
+
+  let spotLight = new SpotLight(0xFFFFFF);
+  spotLight.position.set(-60, 40, -65);
+  spotLight.castShadow = true;
+  spotLight.shadow.mapSize = new Vector2(1024, 1024);
+  spotLight.shadow.camera.far = 130;
+  spotLight.shadow.camera.near = 40;
+  scene.add(spotLight);
+
+  let renderer = new WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  renderer.shadowMap.enabled = true;
+  output.appendChild(renderer.domElement);
+
+
+  function addStats() {
+    let stats = new Stats();
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.left = '0px';
+    stats.domElement.style.top = '0px';
+    stats.setMode(0);
+    let statsWrap = document.getElementById('stats-wrap');
+    statsWrap.appendChild(stats.domElement);
+    return stats;
+  }
+  let stats = addStats();
+
+  let gap = 0;
+  function setRotate() {
+    cube.rotation.x += 0.01;
+    cube.rotation.y += 0.01;
+    cube.rotation.z += 0.01;
+    gap += 0.01;
+  }
+
+  let ctrlObj = {
+    rotationSpeed: 0.01,
+    jumpSpeed: 0.01,
+  }
+  let ctrl = new dat.GUI();
+  ctrl.add(ctrlObj, 'rotationSpeed', 0, 1);
+  ctrl.add(ctrlObj, 'jumpSpeed', 0, 1);
+
+  function setRotateEasy() {
+    cube.rotation.x += ctrlObj.rotationSpeed;
+    cube.rotation.y += ctrlObj.rotationSpeed;
+    cube.rotation.z += ctrlObj.rotationSpeed;
+
+    gap += ctrlObj.jumpSpeed;
+  }
+
+  // 封装刷新页面的方法
+  function renderScene() {
+
+    cube.position.x = 25 + (20 * (Math.sin(gap)));
+    cube.position.y = 6 + (20 * Math.abs((Math.cos(gap))));
+
+    stats.update();
+
+    requestAnimationFrame(renderScene);
+    renderer.render(scene, camera);
+  }
+  renderScene();
+
+  window.addEventListener('resize', onWindowResize, false);
+  function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+</script>
+</body>
+</html>

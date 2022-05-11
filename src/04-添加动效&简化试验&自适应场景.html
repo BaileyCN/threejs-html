@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>添加动效&简化试验&自适应场景</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+  <script src="../libs/dat/dat.gui.js"></script>
+</head>
+<body>
+
+<div id="webgl-output"></div>
+<div id="stats-wrap"></div>
+
+<script type="module">
+  import {
+    Scene,
+    PerspectiveCamera,
+    WebGLRenderer,
+    BoxGeometry,
+    MeshBasicMaterial,
+    Mesh,
+    AxesHelper,
+    PlaneGeometry,
+    MeshLambertMaterial,
+    AmbientLight,
+    SpotLight,
+    Vector2,
+  } from '../libs/threejs/Three.js';
+
+  import { Stats } from '../libs/Stats/Stats.js';
+
+  let output = document.getElementById('webgl-output');
+  // 场景是一个容器，主要用于保存、跟踪所要渲染的物体和使用的光源
+  // 没有场景对象就无法渲染任何物体
+  let scene = new Scene(); // 创建场景对象
+
+  // 摄像机决定了在场景中能够看到什么
+  let camera = new PerspectiveCamera(
+    75, // 基于摄像机的角度来计算场景对象在浏览器中会渲染成什么样子
+    window.innerWidth / window.innerHeight, // 宽高比
+    0.1,
+    1000
+  ); // 创建透视摄像机
+  // 设置透视摄像机在坐标轴上的距离，z轴是与屏幕的垂直距离
+  camera.position.x = -30;
+  camera.position.y = 45;
+  camera.position.z = 35;
+  camera.lookAt(scene.position); // 把摄像机的方向对准场景的中心点
+
+  // z轴显示不出来的情况，可能是摄像机在z轴上，需要调整摄像机位置显示z轴
+  let axes = new AxesHelper(50); // 创建三维坐标轴，参数为长度，默认值1
+  axes.setColors(0xff0000, 0x00ff00, 0x0000ff); // 设置坐标轴颜色
+  scene.add(axes); // 把坐标轴添加到场景中
+
+  let geometry = new BoxGeometry(8, 8, 8); // 创建几何体
+  // 显示阴影需要将物体设置成Lambert材质，最终效果是显示更有层次感，更加立体
+  let material = new MeshLambertMaterial({color: 0xff2299}); // 创建网格Lambert材质
+  // 把几何体与Lambert材质进行组合后创建出一个新的网格对象
+  let cube = new Mesh(geometry, material); // 创建网格对象
+  cube.castShadow = true; // 实现阴影
+  cube.position.x = 4;
+  cube.position.y = 10;
+  cube.position.z = 20;
+  scene.add(cube); // 把立方体网格添加到场景中
+
+  // 创建一个地面，用于接受立方体的投影
+  let planeGeometry = new PlaneGeometry(100, 100); // 创建平面几何体，设置宽高为100
+  // MeshLambertMaterial材质可以接收并反射场景中各种光源发射出来的光线
+  // 基础材质与它不同，各种光源对基础材质是没有作用的
+  let planeMaterial = new MeshLambertMaterial({color: 0xcccccc}); // 新建lambert材质，指定颜色
+  // 通过平面几何体对象和Lambert材质来新建一个地面网格对象
+  // 采用Lambert材质创建的地面网格，必须要有一个Lambert光源使其显示，基础材质不需要光源就能显示
+  let plane = new Mesh(planeGeometry, planeMaterial); // 创建地面网格对象
+  plane.rotation.x = -0.5 * Math.PI;
+  plane.position.set(15, 0, 0);
+  // 作为地面接受阴影的对象，必须设置receiveShadow的属性为真
+  plane.receiveShadow = true;
+  scene.add(plane);
+
+  // 创建Lambert光源
+  // AmbientLight光源的颜色会应用到整个场景中的对象
+  // 该光源并没有特殊的来源方向，并且它不会产生阴影，所以不能作为唯一的光源来使用
+  let ambientLight = new AmbientLight(0xAAAAAA); // 创建AmbientLight光源对象，设置颜色
+  scene.add(ambientLight);
+
+  // 要有阴影的效果，需要产生阴影的光源
+  let spotLight = new SpotLight(0xFFFFFF); // 创建聚光灯光源对象
+  spotLight.position.set(-60, 40, -65);
+  // 想让聚光灯产生阴影，必须设置castShadow的属性为真
+  spotLight.castShadow = true;
+  // 下面三行设置阴影效果
+  spotLight.shadow.mapSize = new Vector2(1024, 1024);
+  spotLight.shadow.camera.far = 130;
+  spotLight.shadow.camera.near = 40;
+  scene.add(spotLight);
+
+  let renderer = new WebGLRenderer(); // 创建渲染器
+  renderer.setSize(window.innerWidth, window.innerHeight); // 设置渲染器大小
+  // 要实现阴影，必须在渲染器的shadowMap中的enabled属性设置为真，还要设置立方体的castShadow的属性为真
+  renderer.shadowMap.enabled = true;
+  output.appendChild(renderer.domElement); // 将渲染器中的dom元素添加到指定的容器中
+
+
+  // 给接下来的动画显示运行时的效率，借助辅助库stats
+  // 该库主要用于检测动画运行的帧数
+  function addStats() {
+    let stats = new Stats(); // 创建统计对象
+    // 初始化统计对象的位置
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.left = '0px';
+    stats.domElement.style.top = '0px';
+    // 因为想要检测画面每秒传输帧数，所以需要调用setMode方法
+    // 可以通过setMode方法的参数直接显示渲染时间
+    stats.setMode(0);
+    // 最后将创建的统计对象元素添加至此元素中
+    let statsWrap = document.getElementById('stats-wrap');
+    statsWrap.appendChild(stats.domElement);
+    return stats; // 返回统计对象，方便后续调用
+  }
+  // 统计对象
+  let stats = addStats();
+
+
+  // 几何体跳跃动效
+  // 需要一个变量gap来存放跳跃的速度，通过position属性来实现几何体的跳跃
+  let gap = 0;
+  // 实现几何体的旋转和跳跃,该方法实现想要的效果需要多次试验
+  function setRotate() {
+    // 实现旋转效果，只需要在每次调用renderScene方法时对rotation属性值进行修改
+    cube.rotation.x += 0.01; // 几何体旋转速度
+    cube.rotation.y += 0.01; // 几何体旋转速度
+    cube.rotation.z += 0.01; // 几何体旋转速度
+    gap += 0.01;
+  }
+
+  // 可借助dat.GUI库简化试验过程，更快的实现动画效果
+  // 需要一个对象来保存修改的属性值，
+  let ctrlObj = {
+    rotationSpeed: 0.01, // 用于保存几何体的旋转速度
+    jumpSpeed: 0.01, // 用于保存几何体的跳跃速度
+  }
+  // 创建dat.GUI对象
+  let ctrl = new dat.GUI();
+  // 将用于保存属性的对象，传入GUI对象中
+  // 并且对其中设置立方体旋转速度的属性进行范围设置，范围是0-1
+  ctrl.add(ctrlObj, 'rotationSpeed', 0, 1);
+  // 并且对其中设置立方体跳跃速度的属性进行范围设置，范围是0-1
+  ctrl.add(ctrlObj, 'jumpSpeed', 0, 1);
+
+  function setRotateEasy() {
+    // 将立方体的旋转速度修改为设置保存的速度
+    cube.rotation.x += ctrlObj.rotationSpeed; // 几何体旋转速度
+    cube.rotation.y += ctrlObj.rotationSpeed; // 几何体旋转速度
+    cube.rotation.z += ctrlObj.rotationSpeed; // 几何体旋转速度
+
+    // 再将立方体的跳跃速度修改为设置保存的速度
+    gap += ctrlObj.jumpSpeed;
+  }
+
+  // 封装刷新页面的方法
+  function renderScene() {
+    // setRotate();
+    setRotateEasy();
+    // 在x轴方向和y轴方向上进行位置变化，需要对position的x和y属性进行修改
+    // 通过Math.sin()方法创建几何体在x轴方向上的运行轨迹
+    cube.position.x = 25 + (20 * (Math.sin(gap)));
+    // 通过Math.cos()方法创建几何体在y轴方向上的运行轨迹
+    cube.position.y = 6 + (20 * Math.abs((Math.cos(gap))));
+    // 通过对gap值的修改实现位置的变化
+
+    stats.update();
+    // 该方法能够使得浏览器平滑高效的进行绘制
+    requestAnimationFrame(renderScene);
+    // 将场景和摄像机2个对象传入渲染器中
+    renderer.render(scene, camera);
+  }
+  renderScene();
+
+  // 实现三维场景的自适应功能
+  // 监听浏览器的resize事件，并且通过回调函数来重写事件
+  window.addEventListener('resize', onWindowResize, false);
+  function onWindowResize() {
+    // 需要在回调函数中重新设置camera的aspect属性，用于重新确定浏览器需要渲染的长宽比
+    camera.aspect = window.innerWidth / window.innerHeight;
+    // 修改完aspect属性之后，需要调用方法，以此来手动更新相机的投影矩阵
+    camera.updateProjectionMatrix();
+    // 最后通过render的setSize方法重置场景的渲染尺寸
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+</script>
+</body>
+</html>

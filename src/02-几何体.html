@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+</head>
+<body>
+  <!--  threejs的渲染效果显示在这个div上 -->
+  <div id="webgl-output"></div>
+
+  <script type="module">
+    import { Scene, PerspectiveCamera, WebGLRenderer, BoxGeometry, MeshBasicMaterial, Mesh } from "../libs/threejs/Three.js";
+    // 场景是一个容器，主要用于保存、跟踪所要渲染的物体和使用的光源
+    // 没有场景对象就无法渲染任何物体
+    let scene = new Scene(); // 创建场景对象
+
+    // 摄像机决定了在场景中能够看到什么
+    let camera = new PerspectiveCamera(
+      75, // 基于摄像机的角度来计算场景对象在浏览器中会渲染成什么样子
+      window.innerWidth / window.innerHeight, // 宽高比
+      0.1,
+      1000
+    ); // 创建透视摄像机
+    // 设置透视摄像机在z轴上的距离，也就是与屏幕的垂直距离
+    camera.position.z = 5;
+
+    let geometry = new BoxGeometry(); // 创建几何体
+    let material = new MeshBasicMaterial({color: 0xff2299}); // 创建网格基础材质
+    // 把几何体与基础材质进行组合后创建出一个新的网格对象
+    let cube = new Mesh(geometry, material); // 创建网格对象
+    // 旋转网格对象
+    cube.rotation.x += 1;
+    cube.rotation.y += 1;
+    cube.rotation.z += 1;
+    // 把立方体网格添加到场景中
+    scene.add(cube);
+
+    // 将场景和摄像机2个对象传入渲染器中
+    let output = document.getElementById('webgl-output');
+    let renderer = new WebGLRenderer(); // 创建渲染器
+    renderer.setSize(window.innerWidth, window.innerHeight); // 设置渲染器大小
+    output.appendChild(renderer.domElement); // 将渲染器中的dom元素添加到指定的容器中
+    renderer.render(scene, camera);
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+</head>
+<body>
+<!--  threejs的渲染效果显示在这个div上 -->
+<div id="webgl-output"></div>
+
+<script type="module">
+  import {
+    Scene,
+    PerspectiveCamera,
+    WebGLRenderer,
+    BoxGeometry,
+    MeshBasicMaterial,
+    Mesh,
+    AxesHelper,
+    PlaneGeometry,
+    MeshLambertMaterial,
+    AmbientLight,
+    SpotLight,
+    Vector2,
+  } from "../libs/threejs/Three.js";
+
+  let output = document.getElementById('webgl-output');
+  // 场景是一个容器，主要用于保存、跟踪所要渲染的物体和使用的光源
+  // 没有场景对象就无法渲染任何物体
+  let scene = new Scene(); // 创建场景对象
+
+  // 摄像机决定了在场景中能够看到什么
+  let camera = new PerspectiveCamera(
+    75, // 基于摄像机的角度来计算场景对象在浏览器中会渲染成什么样子
+    window.innerWidth / window.innerHeight, // 宽高比
+    0.1,
+    1000
+  ); // 创建透视摄像机
+  // 设置透视摄像机在坐标轴上的距离，z轴是与屏幕的垂直距离
+  camera.position.x = -30;
+  camera.position.y = 45;
+  camera.position.z = 35;
+  camera.lookAt(scene.position); // 把摄像机的方向对准场景的中心点
+
+
+  // z轴显示不出来的情况，可能是摄像机在z轴上，需要调整摄像机位置显示z轴
+  let axes = new AxesHelper(50); // 创建三维坐标轴，参数为长度，默认值1
+  axes.setColors(0xff0000, 0x00ff00, 0x0000ff); // 设置坐标轴颜色
+  scene.add(axes); // 把坐标轴添加到场景中
+
+  let geometry = new BoxGeometry(8, 8, 8); // 创建几何体
+  // 显示阴影需要将物体设置成Lambert材质，最终效果是显示更有层次感，更加立体
+  let material = new MeshLambertMaterial({color: 0xff2299}); // 创建网格Lambert材质
+  // 把几何体与Lambert材质进行组合后创建出一个新的网格对象
+  let cube = new Mesh(geometry, material); // 创建网格对象
+  cube.castShadow = true; // 实现阴影
+  cube.position.x = 4;
+  cube.position.y = 10;
+  cube.position.z = 20;
+  scene.add(cube); // 把立方体网格添加到场景中
+
+  // 创建一个地面，用于接受立方体的投影
+  let planeGeometry = new PlaneGeometry(100, 100); // 创建平面几何体，设置宽高为100
+  // MeshLambertMaterial材质可以接收并反射场景中各种光源发射出来的光线
+  // 基础材质与它不同，各种光源对基础材质是没有作用的
+  let planeMaterial = new MeshLambertMaterial({color: 0xcccccc}); // 新建lambert材质，指定颜色
+  // 通过平面几何体对象和Lambert材质来新建一个地面网格对象
+  // 采用Lambert材质创建的地面网格，必须要有一个Lambert光源使其显示，基础材质不需要光源就能显示
+  let plane = new Mesh(planeGeometry, planeMaterial); // 创建地面网格对象
+  plane.rotation.x = -0.5 * Math.PI;
+  plane.position.set(15, 0, 0);
+  // 作为地面接受阴影的对象，必须设置receiveShadow的属性为真
+  plane.receiveShadow = true;
+  scene.add(plane);
+
+  // 创建Lambert光源
+  // AmbientLight光源的颜色会应用到整个场景中的对象
+  // 该光源并没有特殊的来源方向，并且它不会产生阴影，所以不能作为唯一的光源来使用
+  let ambientLight = new AmbientLight(0xAAAAAA); // 创建AmbientLight光源对象，设置颜色
+  scene.add(ambientLight);
+
+  // 要有阴影的效果，需要产生阴影的光源
+  let spotLight = new SpotLight(0xFFFFFF); // 创建聚光灯光源对象
+  spotLight.position.set(-60, 40, -65);
+  // 想让聚光灯产生阴影，必须设置castShadow的属性为真
+  spotLight.castShadow = true;
+  // 下面三行设置阴影效果
+  spotLight.shadow.mapSize = new Vector2(1024, 1024);
+  spotLight.shadow.camera.far = 130;
+  spotLight.shadow.camera.near = 40;
+  scene.add(spotLight);
+
+  let renderer = new WebGLRenderer(); // 创建渲染器
+  renderer.setSize(window.innerWidth, window.innerHeight); // 设置渲染器大小
+  // 要实现阴影，必须在渲染器的shadowMap中的enabled属性设置为真，还要设置立方体的castShadow的属性为真
+  renderer.shadowMap.enabled = true;
+  output.appendChild(renderer.domElement); // 将渲染器中的dom元素添加到指定的容器中
+  // 将场景和摄像机2个对象传入渲染器中
+  renderer.render(scene, camera);
+
+</script>
+</body>
+</html>
